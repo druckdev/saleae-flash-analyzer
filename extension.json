@@ -1,0 +1,13 @@
+{
+  "name": "SPI NOR Flash (W25/JEDEC)",
+  "apiVersion": "1.0.0",
+  "author": "",
+  "version": "0.3.0",
+  "description": "Decodes SPI NOR flash commands compatible with the JEDEC/W25 instruction set: Winbond W25Q/W25R, GigaDevice GD25, ISSI IS25, Macronix MX25, Micron MT25Q, Spansion/Infineon S25FL and others. Covers Standard/Dual/Quad SPI, 3- and 4-byte addressing, and RPMC.",
+  "extensions": {
+    "SPI NOR Flash (W25/JEDEC)": {
+      "type": "HighLevelAnalyzer",
+      "entryPoint": "HighLevelAnalyzer.Hla"
+    }
+  }
+}
