@@ -137,7 +137,7 @@ _CAP_BYTES = 300
 
 class Hla(HighLevelAnalyzer):
     # Number of data bytes shown in the annotation (address bytes not counted)
-    max_displayed_bytes = NumberSetting(min_value=1, max_value=64)
+    max_n = NumberSetting(min_value=1, max_value=64, label='Max Displayed Bytes')
 
     result_types = {
         'read':    {'format': '{{data.str}}'},
@@ -156,6 +156,7 @@ class Hla(HighLevelAnalyzer):
         self.mosi = b''
         self.miso = b''
         self.captured = 0
+        self.max_n = int(self.max_n)
 
     # ── Frame accumulation ────────────────────────────────────────────────────
 
@@ -199,7 +200,6 @@ class Hla(HighLevelAnalyzer):
             return None
 
         opcode = self.mosi[0]
-        max_n = int(self.max_displayed_bytes)
 
         if opcode not in COMMANDS:
             raw = ' '.join(f'{b:02X}' for b in self.mosi[:8])
@@ -232,9 +232,9 @@ class Hla(HighLevelAnalyzer):
 
         data_str = ''
         if cmd['dir'] == 'read' and len(self.miso) > data_start:
-            data_str = '  →  ' + _fmt(self.miso[data_start:], max_n)
+            data_str = '  →  ' + _fmt(self.miso[data_start:], self.max_n)
         elif cmd['dir'] == 'write' and len(self.mosi) > data_start:
-            data_str = '  ←  ' + _fmt(self.mosi[data_start:], max_n)
+            data_str = '  ←  ' + _fmt(self.mosi[data_start:], self.max_n)
 
         return AnalyzerFrame(cmd['rtype'], self.start_time, self.end_time, {
             'str': f"{cmd['name']} [0x{opcode:02X}]{addr_str}{data_str}"
