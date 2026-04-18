@@ -21,7 +21,7 @@ import argparse
 from dataclasses import dataclass, field
 from typing import List, Optional, Iterator
 
-# ── Formatting helpers ────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def fmt_bytes(data: List[int], max_n: int = 32) -> str:
     if not data:
@@ -31,6 +31,12 @@ def fmt_bytes(data: List[int], max_n: int = 32) -> str:
     if len(data) > max_n:
         s += f" … [{len(data)} bytes total]"
     return s
+
+
+def resolve_len_tuple(field: Union[int, tuple], four_byte_addressing: bool) -> int:
+    if type(field) is tuple:
+        return field[four_byte_addressing]
+    return field
 
 
 # ── Data model ────────────────────────────────────────────────────────────────
@@ -59,99 +65,100 @@ class Transaction:
 
 # ── Instruction table ─────────────────────────────────────────────────────────
 #
-# addr  : number of 3-byte address fields sent on single MOSI
+# addr  : number of address bytes sent on single MOSI
 # dummy : number of dummy bytes sent on single MOSI
 # dir   : "read"  → data comes back on MISO
 #         "write" → data sent on MOSI
 #         None    → no data phase (address/erase-only commands)
 # multi : True → after the command byte the bus switches to dual/quad lines;
 #                discard everything after the opcode.
+#
+# NOTE: addr and dummy can be either an integer or a tuple of length 2. In the case of
+#   the later, the value will be selected depending on if the 4-Byte Address Mode is
+#   activated or not.
 
 COMMANDS: dict = {
     # ── Write control ─────────────────────────────────────────────────────────
-    0x06: {"name": "Write Enable",                         "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0x50: {"name": "Volatile SR Write Enable",              "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0x04: {"name": "Write Disable",                         "addr": 0, "dummy": 0, "dir": None,    "multi": False},
+    0x06: {"name": "Write Enable",                          "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0x50: {"name": "Volatile SR Write Enable",              "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0x04: {"name": "Write Disable",                         "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
 
     # ── Device identification ─────────────────────────────────────────────────
-    0xAB: {"name": "Release Power-down / Device ID",        "addr": 3, "dummy": 0, "dir": "read",  "multi": False},
-    0x90: {"name": "Read Manufacturer/Device ID",           "addr": 3, "dummy": 0, "dir": "read",  "multi": False},
-    0x9F: {"name": "Read JEDEC ID",                         "addr": 0, "dummy": 0, "dir": "read",  "multi": False},
-    0x4B: {"name": "Read Unique ID",                        "addr": 0, "dummy": 4, "dir": "read",  "multi": False},
+    0xAB: {"name": "Release Power-down / Device ID",        "addr": 0,      "dummy": 3,      "dir": "read",  "multi": False},
+    0x90: {"name": "Read Manufacturer/Device ID",           "addr": 0,      "dummy": 3,      "dir": "read",  "multi": False},
+    0x9F: {"name": "Read JEDEC ID",                         "addr": 0,      "dummy": 0,      "dir": "read",  "multi": False},
+    0x4B: {"name": "Read Unique ID",                        "addr": 0,      "dummy": (4, 5), "dir": "read",  "multi": False},
 
     # ── Read ──────────────────────────────────────────────────────────────────
-    0x03: {"name": "Read Data",                             "addr": 3, "dummy": 0, "dir": "read",  "multi": False},
-    0x0B: {"name": "Fast Read",                             "addr": 3, "dummy": 1, "dir": "read",  "multi": False},
-    0x3B: {"name": "Fast Read Dual Output",                 "addr": 3, "dummy": 1, "dir": "read",  "multi": True},   # data on 2 lines
-    0x6B: {"name": "Fast Read Quad Output",                 "addr": 3, "dummy": 1, "dir": "read",  "multi": True},   # data on 4 lines
-    0xBB: {"name": "Fast Read Dual I/O",                    "addr": 3, "dummy": 1, "dir": "read",  "multi": True},   # addr+data on 2 lines
-    0xEB: {"name": "Fast Read Quad I/O",                    "addr": 3, "dummy": 3, "dir": "read",  "multi": True},   # addr+data on 4 lines
+    0x03: {"name": "Read Data",                             "addr": (3, 4), "dummy": 0,      "dir": "read",  "multi": False},
+    0x0B: {"name": "Fast Read",                             "addr": (3, 4), "dummy": 1,      "dir": "read",  "multi": False},
+    0x3B: {"name": "Fast Read Dual Output",                 "addr": (3, 4), "dummy": 1,      "dir": "read",  "multi": True},   # data on 2 lines
+    0x6B: {"name": "Fast Read Quad Output",                 "addr": (3, 4), "dummy": 1,      "dir": "read",  "multi": True},   # data on 4 lines
+    0xBB: {"name": "Fast Read Dual I/O",                    "addr": (3, 4), "dummy": 1,      "dir": "read",  "multi": True},   # addr+data on 2 lines
+    0xEB: {"name": "Fast Read Quad I/O",                    "addr": (3, 4), "dummy": 3,      "dir": "read",  "multi": True},   # addr+data on 4 lines
 
     # ── Write ─────────────────────────────────────────────────────────────────
-    0x77: {"name": "Set Burst with Wrap",                   "addr": 0, "dummy": 3, "dir": "write", "multi": True},
-    0x02: {"name": "Page Program",                          "addr": 3, "dummy": 0, "dir": "write", "multi": False},
-    0x32: {"name": "Quad Input Page Program",               "addr": 3, "dummy": 0, "dir": "write", "multi": True},   # data on 4 lines
+    0x77: {"name": "Set Burst with Wrap",                   "addr": 0,      "dummy": 3,      "dir": "write", "multi": True},
+    0x02: {"name": "Page Program",                          "addr": (3, 4), "dummy": 0,      "dir": "write", "multi": False},
+    0x32: {"name": "Quad Input Page Program",               "addr": (3, 4), "dummy": 0,      "dir": "write", "multi": True},   # data on 4 lines
 
     # ── Erase ─────────────────────────────────────────────────────────────────
-    0x20: {"name": "Sector Erase (4KB)",                    "addr": 3, "dummy": 0, "dir": None,    "multi": False},
-    0x52: {"name": "32KB Block Erase",                      "addr": 3, "dummy": 0, "dir": None,    "multi": False},
-    0xD8: {"name": "64KB Block Erase",                      "addr": 3, "dummy": 0, "dir": None,    "multi": False},
-    0xC7: {"name": "Chip Erase",                            "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0x60: {"name": "Chip Erase (alt)",                      "addr": 0, "dummy": 0, "dir": None,    "multi": False},
+    0x20: {"name": "Sector Erase (4KB)",                    "addr": (3, 4), "dummy": 0,      "dir": None,    "multi": False},
+    0x52: {"name": "32KB Block Erase",                      "addr": (3, 4), "dummy": 0,      "dir": None,    "multi": False},
+    0xD8: {"name": "64KB Block Erase",                      "addr": (3, 4), "dummy": 0,      "dir": None,    "multi": False},
+    0xC7: {"name": "Chip Erase",                            "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0x60: {"name": "Chip Erase (alt)",                      "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
 
     # ── Status / Configuration registers ─────────────────────────────────────
-    0x05: {"name": "Read Status Register-1",                "addr": 0, "dummy": 0, "dir": "read",  "multi": False},
-    0x01: {"name": "Write Status Register-1",               "addr": 0, "dummy": 0, "dir": "write", "multi": False},
-    0x35: {"name": "Read Status Register-2",                "addr": 0, "dummy": 0, "dir": "read",  "multi": False},
-    0x31: {"name": "Write Status Register-2",               "addr": 0, "dummy": 0, "dir": "write", "multi": False},
-    0x15: {"name": "Read Status Register-3",                "addr": 0, "dummy": 0, "dir": "read",  "multi": False},
-    0x11: {"name": "Write Status Register-3",               "addr": 0, "dummy": 0, "dir": "write", "multi": False},
+    0x05: {"name": "Read Status Register-1",                "addr": 0,      "dummy": 0,      "dir": "read",  "multi": False},
+    0x01: {"name": "Write Status Register-1",               "addr": 0,      "dummy": 0,      "dir": "write", "multi": False},
+    0x35: {"name": "Read Status Register-2",                "addr": 0,      "dummy": 0,      "dir": "read",  "multi": False},
+    0x31: {"name": "Write Status Register-2",               "addr": 0,      "dummy": 0,      "dir": "write", "multi": False},
+    0x15: {"name": "Read Status Register-3",                "addr": 0,      "dummy": 0,      "dir": "read",  "multi": False},
+    0x11: {"name": "Write Status Register-3",               "addr": 0,      "dummy": 0,      "dir": "write", "multi": False},
 
     # ── SFDP / Security registers ─────────────────────────────────────────────
-    0x5A: {"name": "Read SFDP Register",                    "addr": 3, "dummy": 1, "dir": "read",  "multi": False},
-    0x44: {"name": "Erase Security Register",               "addr": 3, "dummy": 0, "dir": None,    "multi": False},
-    0x42: {"name": "Program Security Register",             "addr": 3, "dummy": 0, "dir": "write", "multi": False},
-    0x48: {"name": "Read Security Register",                "addr": 3, "dummy": 1, "dir": "read",  "multi": False},
+    0x5A: {"name": "Read SFDP Register",                    "addr": (3, 4), "dummy": 1,      "dir": "read",  "multi": False},
+    0x44: {"name": "Erase Security Register",               "addr": (3, 4), "dummy": 0,      "dir": None,    "multi": False},
+    0x42: {"name": "Program Security Register",             "addr": (3, 4), "dummy": 0,      "dir": "write", "multi": False},
+    0x48: {"name": "Read Security Register",                "addr": (3, 4), "dummy": 1,      "dir": "read",  "multi": False},
 
     # ── Block / Sector lock ───────────────────────────────────────────────────
-    0x7E: {"name": "Global Block Lock",                     "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0x98: {"name": "Global Block Unlock",                   "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0x3D: {"name": "Read Block/Sector Lock",                "addr": 3, "dummy": 0, "dir": "read",  "multi": False},
-    0x36: {"name": "Individual Block Lock",                 "addr": 3, "dummy": 0, "dir": None,    "multi": False},
-    0x39: {"name": "Individual Block Unlock",               "addr": 3, "dummy": 0, "dir": None,    "multi": False},
+    0x7E: {"name": "Global Block Lock",                     "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0x98: {"name": "Global Block Unlock",                   "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0x3D: {"name": "Read Block/Sector Lock",                "addr": (3, 4), "dummy": 0,      "dir": "read",  "multi": False},
+    0x36: {"name": "Individual Block Lock",                 "addr": (3, 4), "dummy": 0,      "dir": None,    "multi": False},
+    0x39: {"name": "Individual Block Unlock",               "addr": (3, 4), "dummy": 0,      "dir": None,    "multi": False},
 
     # ── Suspend / Resume / Power ──────────────────────────────────────────────
-    0x75: {"name": "Erase/Program Suspend",                 "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0x7A: {"name": "Erase/Program Resume",                  "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0xB9: {"name": "Power-down",                            "addr": 0, "dummy": 0, "dir": None,    "multi": False},
+    0x75: {"name": "Erase/Program Suspend",                 "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0x7A: {"name": "Erase/Program Resume",                  "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0xB9: {"name": "Power-down",                            "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
 
     # ── Reset ─────────────────────────────────────────────────────────────────
-    0x66: {"name": "Enable Reset",                          "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0x99: {"name": "Reset Device",                          "addr": 0, "dummy": 0, "dir": None,    "multi": False},
+    0x66: {"name": "Enable Reset",                          "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
+    0x99: {"name": "Reset Device",                          "addr": 0,      "dummy": 0,      "dir": None,    "multi": False},
 
     # ── 4-byte address mode (W25R256JW and larger) ────────────────────────────
-    # Note: when in 4-byte mode the 3-byte opcodes (03h, 0Bh, …) silently take
-    # a 4th address byte; the decoder cannot detect this without state tracking.
-    # The dedicated opcodes below are unambiguously 4-byte regardless of mode.
-    0xB7: {"name": "Enter 4-Byte Address Mode",             "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0xE9: {"name": "Exit 4-Byte Address Mode",              "addr": 0, "dummy": 0, "dir": None,    "multi": False},
-    0xC8: {"name": "Read Extended Address Register",        "addr": 0, "dummy": 0, "dir": "read",  "multi": False},
-    0xC5: {"name": "Write Extended Address Register",       "addr": 0, "dummy": 0, "dir": "write", "multi": False},
-    0x13: {"name": "Read Data (4-byte addr)",               "addr": 4, "dummy": 0, "dir": "read",  "multi": False},
-    0x0C: {"name": "Fast Read (4-byte addr)",               "addr": 4, "dummy": 1, "dir": "read",  "multi": False},
-    0x3C: {"name": "Fast Read Dual Output (4-byte addr)",   "addr": 4, "dummy": 1, "dir": "read",  "multi": True},
-    0x6C: {"name": "Fast Read Quad Output (4-byte addr)",   "addr": 4, "dummy": 1, "dir": "read",  "multi": True},
-    0xBC: {"name": "Fast Read Dual I/O (4-byte addr)",      "addr": 4, "dummy": 1, "dir": "read",  "multi": True},
-    0xEC: {"name": "Fast Read Quad I/O (4-byte addr)",      "addr": 4, "dummy": 3, "dir": "read",  "multi": True},
+    0xB7: {"name": "Enter 4-Byte Address Mode",             "addr": 0,      "dummy": 0,      "dir": None,    "multi": False, "4addr": True},
+    0xE9: {"name": "Exit 4-Byte Address Mode",              "addr": 0,      "dummy": 0,      "dir": None,    "multi": False, "4addr": False},
+    0xC8: {"name": "Read Extended Address Register",        "addr": 0,      "dummy": 0,      "dir": "read",  "multi": False},
+    0xC5: {"name": "Write Extended Address Register",       "addr": 0,      "dummy": 0,      "dir": "write", "multi": False},
+    0x13: {"name": "Read Data (4-byte addr)",               "addr": 4,      "dummy": 0,      "dir": "read",  "multi": False},
+    0x0C: {"name": "Fast Read (4-byte addr)",               "addr": 4,      "dummy": 1,      "dir": "read",  "multi": False},
+    0x3C: {"name": "Fast Read Dual Output (4-byte addr)",   "addr": 4,      "dummy": 1,      "dir": "read",  "multi": True},
+    0x6C: {"name": "Fast Read Quad Output (4-byte addr)",   "addr": 4,      "dummy": 1,      "dir": "read",  "multi": True},
+    0xBC: {"name": "Fast Read Dual I/O (4-byte addr)",      "addr": 4,      "dummy": 1,      "dir": "read",  "multi": True},
+    0xEC: {"name": "Fast Read Quad I/O (4-byte addr)",      "addr": 4,      "dummy": 3,      "dir": "read",  "multi": True},
 
     # ── RPMC ──────────────────────────────────────────────────────────────────
     # 0x9B is dispatched further based on the CmdType byte (byte 2)
-    0x9B: {"name": "RPMC OP1",                              "addr": 0, "dummy": 0, "dir": "write", "multi": False, "rpmc_op1": True},
-    0x96: {"name": "Read RPMC Status/Data",                 "addr": 0, "dummy": 1, "dir": "read",  "multi": False},
+    0x9B: {"name": "RPMC OP1",                              "addr": 0,      "dummy": 0,      "dir": "write", "multi": False, "rpmc_op1": True},
+    0x96: {"name": "Read RPMC Status/Data",                 "addr": 0,      "dummy": 1,      "dir": "read",  "multi": False},
 
     # ── Dual/Quad device-ID reads (address/data on multi lines) ──────────────
-    0x92: {"name": "Read Manufacturer/Device ID Dual I/O",  "addr": 3, "dummy": 0, "dir": "read",  "multi": True},
-    0x94: {"name": "Read Manufacturer/Device ID Quad I/O",  "addr": 3, "dummy": 0, "dir": "read",  "multi": True},
+    0x92: {"name": "Read Manufacturer/Device ID Dual I/O",  "addr": (3, 4), "dummy": 0,      "dir": "read",  "multi": True},
+    0x94: {"name": "Read Manufacturer/Device ID Quad I/O",  "addr": (3, 4), "dummy": 0,      "dir": "read",  "multi": True},
 }
 
 RPMC_OP1_SUBTYPES = {
@@ -241,18 +248,18 @@ def parse_and_group(
 
 # ── Decoder ───────────────────────────────────────────────────────────────────
 
-def decode_transaction(tx: Transaction, max_data: int = 32) -> str:
+def decode_transaction(tx: Transaction, max_data: int = 32, four_byte_addressing: bool) -> str, bool:
     mosi = tx.mosi_bytes
     miso = tx.miso_bytes
 
     if not mosi:
-        return "(empty)"
+        return "(empty)", four_byte_addressing
 
     opcode = mosi[0]
 
     if opcode not in COMMANDS:
         raw = " ".join(f"{b:02X}" for b in mosi)
-        return f"UNKNOWN [0x{opcode:02X}]  ({len(mosi)} byte(s): {raw})"
+        return f"UNKNOWN [0x{opcode:02X}]  ({len(mosi)} byte(s): {raw})", four_byte_addressing
 
     cmd  = COMMANDS[opcode]
     name = cmd["name"]
@@ -261,7 +268,7 @@ def decode_transaction(tx: Transaction, max_data: int = 32) -> str:
     if cmd["multi"]:
         return (f"{name} [0x{opcode:02X}]"
                 f"  (quad/dual — addr/data on multi-wire lines; "
-                f"{len(mosi)} bytes captured)")
+                f"{len(mosi)} bytes captured)"), four_byte_addressing
 
     # RPMC OP1: dispatch on CmdType (byte 2)
     if cmd.get("rpmc_op1"):
@@ -269,11 +276,14 @@ def decode_transaction(tx: Transaction, max_data: int = 32) -> str:
             sub    = mosi[1]
             sub_name = RPMC_OP1_SUBTYPES.get(sub, f"Reserved subtype 0x{sub:02X}")
             caddr  = f"counter_addr=0x{mosi[2]:02X}" if len(mosi) > 2 else "counter_addr=?"
-            return f"RPMC OP1 – {sub_name} [0x9B / 0x{sub:02X}]  {caddr}"
-        return f"RPMC OP1 [0x9B]  (incomplete — only {len(mosi)} byte(s))"
+            return f"RPMC OP1 – {sub_name} [0x9B / 0x{sub:02X}]  {caddr}", four_byte_addressing
+        return f"RPMC OP1 [0x9B]  (incomplete — only {len(mosi)} byte(s))", four_byte_addressing
 
-    n_addr  = cmd["addr"]
-    n_dummy = cmd["dummy"]
+    if cmd.get('4addr') is not None:
+        four_byte_addressing = cmd.get('4addr')
+
+    n_addr     = resolve_len_tuple(cmd['addr'], four_byte_addressing)
+    n_dummy    = resolve_len_tuple(cmd['dummy'], four_byte_addressing)
     data_start = 1 + n_addr + n_dummy
 
     # Address
@@ -295,7 +305,7 @@ def decode_transaction(tx: Transaction, max_data: int = 32) -> str:
         data = mosi[data_start:]
         data_str = f"  ← {fmt_bytes(data, max_data)}"
 
-    return f"{name} [0x{opcode:02X}]{addr_str}{data_str}"
+    return f"{name} [0x{opcode:02X}]{addr_str}{data_str}", four_byte_addressing
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -335,7 +345,7 @@ def main() -> None:
 
     for tx in gen:
         n_tx += 1
-        decoded = decode_transaction(tx, args.max_data)
+        decoded, four_byte_addressing = decode_transaction(tx, args.max_data, four_byte_addressing)
 
         if not args.no_timestamps:
             ts = f"[{tx.start_time:.9f}] "

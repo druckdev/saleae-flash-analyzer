@@ -75,9 +75,9 @@ command name and the number of bytes captured, but no address or data.
 
 ## Notes on 4-byte addressing
 
-Parts larger than 128 Mbit (e.g. W25R256JW) support a 4-byte address mode.
-The dedicated 4-byte opcodes (`13h`, `0Ch`, `3Ch`, `6Ch`, `BCh`, `ECh`) are
-always decoded with a 4-byte address regardless of the current address mode
-setting. The shared 3-byte opcodes (`03h`, `0Bh`, `20h`, etc.) are always
-decoded with a 3-byte address; if the device is currently in 4-byte mode those
-annotations will show a wrong address.
+Parts larger than 128 Mbit (e.g. W25R256JW) support a 4-byte address mode. It is
+controlled through the Enter and Exit 4-Byte Address Mode commands. During this
+mode the opcodes that normally take 3-byte addresses (`03h`, `0Bh`, `20h`, etc.)
+will expect 4 bytes. The dedicated 4-byte opcodes (`13h`, `0Ch`, `3Ch`, `6Ch`,
+`BCh`, `ECh`) are always decoded with a 4-byte address regardless of the current
+address mode setting.
