@@ -68,15 +68,15 @@ COMMANDS = {
     0x0B: {'name': 'Fast Read',                             'addr': (3, 4), 'dummy': 1,      'dir': 'read',  'multi': False, 'rtype': 'read'},
 
     # ── Dual / Quad reads (addr+data on multiple lines) ──────────────────────
-    0x3B: {'name': 'Fast Read Dual Output',                 'addr': (3, 4), 'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
-    0x6B: {'name': 'Fast Read Quad Output',                 'addr': (3, 4), 'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
-    0xBB: {'name': 'Fast Read Dual I/O',                    'addr': (3, 4), 'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
-    0xEB: {'name': 'Fast Read Quad I/O',                    'addr': (3, 4), 'dummy': 3,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
+    0x3B: {'name': 'Fast Read Dual Output',                 'addr': (3, 4), 'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'read'},
+    0x6B: {'name': 'Fast Read Quad Output',                 'addr': (3, 4), 'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'read'},
+    0xBB: {'name': 'Fast Read Dual I/O',                    'addr': (3, 4), 'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'read'},
+    0xEB: {'name': 'Fast Read Quad I/O',                    'addr': (3, 4), 'dummy': 3,      'dir': 'read',  'multi': True,  'rtype': 'read'},
 
     # ── Write / Program ──────────────────────────────────────────────────────
     0x02: {'name': 'Page Program',                          'addr': (3, 4), 'dummy': 0,      'dir': 'write', 'multi': False, 'rtype': 'write'},
-    0x32: {'name': 'Quad Input Page Program',               'addr': (3, 4), 'dummy': 0,      'dir': 'write', 'multi': True,  'rtype': 'multi'},
-    0x77: {'name': 'Set Burst with Wrap',                   'addr': 0,      'dummy': 3,      'dir': 'write', 'multi': True,  'rtype': 'multi'},
+    0x32: {'name': 'Quad Input Page Program',               'addr': (3, 4), 'dummy': 0,      'dir': 'write', 'multi': True,  'rtype': 'write'},
+    0x77: {'name': 'Set Burst with Wrap',                   'addr': 0,      'dummy': 3,      'dir': 'write', 'multi': True,  'rtype': 'write'},
 
     # ── Erase ────────────────────────────────────────────────────────────────
     0x20: {'name': 'Sector Erase (4KB)',                    'addr': (3, 4), 'dummy': 0,      'dir': None,    'multi': False, 'rtype': 'erase'},
@@ -123,10 +123,10 @@ COMMANDS = {
     0xC5: {'name': 'Write Extended Address Register',       'addr': 0,      'dummy': 0,      'dir': 'write', 'multi': False, 'rtype': 'status'},
     0x13: {'name': 'Read Data (4-byte addr)',               'addr': 4,      'dummy': 0,      'dir': 'read',  'multi': False, 'rtype': 'read'},
     0x0C: {'name': 'Fast Read (4-byte addr)',               'addr': 4,      'dummy': 1,      'dir': 'read',  'multi': False, 'rtype': 'read'},
-    0x3C: {'name': 'Fast Read Dual Output (4-byte addr)',   'addr': 4,      'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
-    0x6C: {'name': 'Fast Read Quad Output (4-byte addr)',   'addr': 4,      'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
-    0xBC: {'name': 'Fast Read Dual I/O (4-byte addr)',      'addr': 4,      'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
-    0xEC: {'name': 'Fast Read Quad I/O (4-byte addr)',      'addr': 4,      'dummy': 3,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
+    0x3C: {'name': 'Fast Read Dual Output (4-byte addr)',   'addr': 4,      'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'read'},
+    0x6C: {'name': 'Fast Read Quad Output (4-byte addr)',   'addr': 4,      'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'read'},
+    0xBC: {'name': 'Fast Read Dual I/O (4-byte addr)',      'addr': 4,      'dummy': 1,      'dir': 'read',  'multi': True,  'rtype': 'read'},
+    0xEC: {'name': 'Fast Read Quad I/O (4-byte addr)',      'addr': 4,      'dummy': 3,      'dir': 'read',  'multi': True,  'rtype': 'read'},
 
     # ── RPMC ─────────────────────────────────────────────────────────────────
     # 0x9B is further dispatched by _analyze_rpmc() based on CmdType (byte 2)
@@ -134,8 +134,8 @@ COMMANDS = {
     0x96: {'name': 'Read RPMC Status/Data',                 'addr': 0,      'dummy': 1,      'dir': 'read',  'multi': False, 'rtype': 'rpmc'},
 
     # ── Dual/Quad device-ID reads ────────────────────────────────────────────
-    0x92: {'name': 'Read Mfr/Dev ID Dual I/O',              'addr': (3, 4), 'dummy': 0,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
-    0x94: {'name': 'Read Mfr/Dev ID Quad I/O',              'addr': (3, 4), 'dummy': 0,      'dir': 'read',  'multi': True,  'rtype': 'multi'},
+    0x92: {'name': 'Read Mfr/Dev ID Dual I/O',              'addr': (3, 4), 'dummy': 0,      'dir': 'read',  'multi': True,  'rtype': 'read'},
+    0x94: {'name': 'Read Mfr/Dev ID Quad I/O',              'addr': (3, 4), 'dummy': 0,      'dir': 'read',  'multi': True,  'rtype': 'read'},
 }
 
 _RPMC_SUBTYPES = {
@@ -159,6 +159,12 @@ class Hla(HighLevelAnalyzer):
     four_byte_addressing = ChoicesSetting(
         ['False', 'True'], label='Start already in 4-Byte Address Mode'
     )
+    # When inspecting QSPI commands with an SPI analyzer or the other way
+    # around, the parsed bytes will be wrong. Decide if these should still be
+    # printed.
+    print_unparseable = ChoicesSetting(
+        ['False', 'True'], label='Print unparseable commands'
+    )
 
     result_types = {
         'read':    {'format': '{{data.str}}'},
@@ -174,22 +180,26 @@ class Hla(HighLevelAnalyzer):
     def __init__(self):
         self.start_time = None
         self.end_time = None
+        self.max_n = int(self.max_n)
+        self.four_byte_addressing = self.four_byte_addressing == 'True'
+        self.print_unparseable = self.print_unparseable == 'True'
+        self.reset()
+
+    def reset(self):
         self.mosi = b''
         self.miso = b''
         self.captured = 0
-        self.max_n = int(self.max_n)
-        self.four_byte_addressing = self.four_byte_addressing == 'True'
+        self.qspi_parser = False
 
     # ── Frame accumulation ────────────────────────────────────────────────────
 
     def decode(self, frame: AnalyzerFrame):
         if frame.type == 'enable':
             self.start_time = frame.start_time
-            self.mosi = b''
-            self.miso = b''
-            self.captured = 0
+            self.reset()
 
         elif frame.type == 'result':
+            # SPI
             if self.start_time is None:          # capture started mid-transaction
                 self.start_time = frame.start_time
             if self.captured < _CAP_BYTES:
@@ -197,14 +207,25 @@ class Hla(HighLevelAnalyzer):
                 self.miso += frame.data['miso']
             self.captured += 1
 
+        elif frame.type == 'data':
+            # QSPI
+            self.qspi_parser = True
+
+            if self.start_time is None:          # capture started mid-transaction
+                self.start_time = frame.start_time
+            if self.captured < _CAP_BYTES:
+                if frame.data['state'] in ('COMMAND', 'ADDRESS'):
+                    self.mosi += frame.data['data']
+                elif frame.data['state'] == 'DATA':
+                    self.miso += frame.data['data']
+            self.captured += 1
+
         elif frame.type == 'disable':
             self.end_time = frame.end_time
             result = self._analyze()
             # Reset for next transaction
             self.start_time = None
-            self.mosi = b''
-            self.miso = b''
-            self.captured = 0
+            self.reset()
             return result
 
         elif frame.type == 'error':
@@ -231,25 +252,39 @@ class Hla(HighLevelAnalyzer):
 
         cmd = COMMANDS[opcode]
 
-        # ── Quad/Dual: discard everything after the opcode ─────────────────
-        if cmd['multi']:
-            extra = f' ({self.captured}B captured)'
-            return AnalyzerFrame(cmd['rtype'], self.start_time, self.end_time, {
-                'str': f"{cmd['name']} [0x{opcode:02X}]{extra}"
-            })
+        # NOTE: we need to do this before returning early
+        if cmd.get('4addr') is not None:
+            self.four_byte_addressing = cmd.get('4addr')
+
+        # ── Special handling of multi opcodes on SPI and single on QSPI ───────
+        # TODO: dual I/O should be parseable by SPI
+        if self.qspi_parser != cmd['multi']:
+            # If the low level analyzer is SPI but this is a QSPI command or
+            # vice-versa, we can't properly parse it
+
+            if self.print_unparseable:
+                extra = f' ({self.captured}B captured)'
+                return AnalyzerFrame(
+                    'multi' if cmd['multi'] else 'single',
+                    self.start_time,
+                    self.end_time,
+                    {'str': f'{cmd['name']} [0x{opcode:02X}]{extra}'},
+                )
+            return None
 
         # ── RPMC OP1: dispatch on CmdType byte ─────────────────────────────
         if cmd.get('rpmc_op1'):
             return self._analyze_rpmc()
 
-        if cmd.get('4addr') is not None:
-            self.four_byte_addressing = cmd.get('4addr')
-
-
         # ── Standard decode: address + data ───────────────────────────────
-        n_addr     = resolve_len_tuple(cmd['addr'], self.four_byte_addressing)
-        n_dummy    = resolve_len_tuple(cmd['dummy'], self.four_byte_addressing)
-        data_start = 1 + n_addr + n_dummy
+        n_addr = resolve_len_tuple(cmd['addr'], self.four_byte_addressing)
+        if self.qspi_parser:
+            # In QSPI we were able to separate input and output bytes already
+            # with the help of the low level analyzer
+            data_start = 0
+        else:
+            n_dummy    = resolve_len_tuple(cmd['dummy'], self.four_byte_addressing)
+            data_start = 1 + n_addr + n_dummy
 
         addr_str = ''
         if n_addr > 0 and len(self.mosi) >= 1 + n_addr:
